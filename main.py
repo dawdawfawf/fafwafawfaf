@@ -14,7 +14,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 TELEGRAM_BOT_TOKEN = "8694705597:AAENqO64XMxwaOi2iEdGiDd8AbpvBKOm7cc"
 
 POLL_INTERVAL          = 4
-SPREAD_THRESHOLD       = 5.0
+SPREAD_THRESHOLD       = 1.0
 SPREAD_DEPTH_MIN       = 1.5
 MIN_VOLUME_24H         = 500_000
 MIN_LIQUIDITY          = 50_000
