@@ -409,14 +409,16 @@ async def main():
     app.add_handler(CommandHandler("stop",  cmd_stop))
 
     await app.initialize()
-
     await app.bot.delete_webhook(drop_pending_updates=True)
+    await asyncio.sleep(3)
 
     await app.start()
-    await app.updater.start_polling(drop_pending_updates=True)
+    await app.updater.start_polling(
+        drop_pending_updates=True,
+        allowed_updates=["message"],
+    )
 
     await start_web_server()
-
     log.info("Bot is running. Waiting for /start from users...")
 
     try:
