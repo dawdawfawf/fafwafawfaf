@@ -1,0 +1,3 @@
+[deploy]
+numReplicas = 1
+restartPolicyType = "never"
