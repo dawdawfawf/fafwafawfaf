@@ -14,16 +14,16 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 TELEGRAM_BOT_TOKEN = "8694705597:AAGJgl9kuTYXWP7s5S_iemrf_OophTNqRN0"
 
 POLL_INTERVAL          = 4
-SPREAD_THRESHOLD       = 1.0
-SPREAD_DEPTH_MIN       = 0.5
-MIN_VOLUME_24H         = 100_000
-MIN_LIQUIDITY          = 50_000
+SPREAD_THRESHOLD       = 5.0
+SPREAD_DEPTH_MIN       = 3.0
+MIN_VOLUME_24H         = 500_000
+MIN_LIQUIDITY          = 100_000
 MAX_LEVERAGE           = 100
-SIGNAL_COOLDOWN        = 60
+SIGNAL_COOLDOWN        = 600
 SUBSCRIBERS_FILE       = "subscribers.json"
 MAX_FUNDING_RATE       = 0.003
 MAX_SPOT_FUTURES_DIFF  = 0.30
-SPREAD_STABLE_WINDOW   = 4
+SPREAD_STABLE_WINDOW   = 8
 SPREAD_STABLE_COUNT    = 2
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
