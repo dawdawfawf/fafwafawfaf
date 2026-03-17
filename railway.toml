@@ -1,3 +1,4 @@
 [deploy]
 numReplicas = 1
 restartPolicyType = "never"
+healthcheckTimeout = 30
