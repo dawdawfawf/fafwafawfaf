@@ -11,7 +11,7 @@ from telegram import Bot, BotCommand, Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-TELEGRAM_BOT_TOKEN = "8694705597:AAENqO64XMxwaOi2iEdGiDd8AbpvBKOm7cc"
+TELEGRAM_BOT_TOKEN = "8694705597:AAEGcuZyxKl4WZAS2ark0vBE7zWL3pxYjNs"
 
 POLL_INTERVAL          = 4
 SPREAD_THRESHOLD       = 1.0
