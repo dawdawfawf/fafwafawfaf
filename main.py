@@ -11,7 +11,7 @@ from telegram import Bot, BotCommand, Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-TELEGRAM_BOT_TOKEN = "8694705597:AAGTeXmhJ938Jp63t72R_t-1VcyUPMOFTSY"
+TELEGRAM_BOT_TOKEN = "8694705597:AAFOXhKxGxQ8wMGx8wxfkNXJ043jXbgBnSo"
 
 POLL_INTERVAL          = 4
 SPREAD_THRESHOLD       = 5.0
@@ -34,6 +34,7 @@ MEXC_TICKER_ALL  = "https://contract.mexc.com/api/v1/contract/ticker"
 MEXC_DETAIL      = "https://contract.mexc.com/api/v1/contract/detail"
 MEXC_DEPTH       = "https://contract.mexc.com/api/v1/contract/depth/"
 MEXC_FUNDING     = "https://contract.mexc.com/api/v1/contract/funding_rate/"
+MEXC_SPOT_PRICES = "https://api.mexc.com/api/v3/ticker/price"
 
 subscribers:     set[int]         = set()
 last_signal:     dict[str, float] = {}
@@ -83,10 +84,10 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log.info(f"Unsubscribed: {chat_id}")
 
 
-def calc_spread(fair_price: float, futures_price: float) -> float:
-    if fair_price == 0:
+def calc_spread(spot_price: float, futures_price: float) -> float:
+    if spot_price == 0:
         return 0.0
-    return (futures_price - fair_price) / fair_price * 100
+    return (futures_price - spot_price) / spot_price * 100
 
 
 def spread_emoji(spread: float) -> str:
@@ -145,6 +146,22 @@ async def fetch_all_tickers(session: aiohttp.ClientSession) -> list[dict]:
     return data.get("data", [])
 
 
+async def fetch_spot_prices(session: aiohttp.ClientSession) -> dict[str, float]:
+    data = await fetch_json(session, MEXC_SPOT_PRICES)
+    if not data or not isinstance(data, list):
+        return {}
+    result = {}
+    for item in data:
+        sym   = item.get("symbol", "")
+        price = item.get("price", 0)
+        if sym and price:
+            try:
+                result[sym] = float(price)
+            except (ValueError, TypeError):
+                pass
+    return result
+
+
 async def check_orderbook_depth(session: aiohttp.ClientSession, symbol: str, min_size_usd: float = 10_000) -> bool:
     data = await fetch_json(session, MEXC_DEPTH + symbol)
     if not data or not data.get("success"):
@@ -176,10 +193,10 @@ async def check_funding_rate(session: aiohttp.ClientSession, symbol: str) -> boo
     return True
 
 
-def check_fair_futures_diff(fair_price: float, futures_price: float) -> bool:
+def check_spot_futures_diff(spot_price: float, futures_price: float) -> bool:
     if futures_price == 0:
         return False
-    diff = abs(fair_price - futures_price) / futures_price
+    diff = abs(spot_price - futures_price) / futures_price
     if diff > MAX_SPOT_FUTURES_DIFF:
         return False
     return True
@@ -209,16 +226,16 @@ def update_spread_history(symbol: str, spread: float) -> bool:
     return all(abs(s) >= SPREAD_THRESHOLD for _, s in recent)
 
 
-def passes_filters(symbol: str, ticker: dict) -> tuple[bool, dict]:
-    futures_price = float(ticker.get("lastPrice",  0) or 0)
-    fair_price    = float(ticker.get("fairPrice",  0) or 0)
-    volume24h_usd = float(ticker.get("volume24",   0) or 0)
-    open_interest = float(ticker.get("holdVol",    0) or 0)
+def passes_filters(symbol: str, ticker: dict, spot_price: float = 0) -> tuple[bool, dict]:
+    futures_price = float(ticker.get("lastPrice", 0) or 0)
+    fair_price    = float(ticker.get("fairPrice", 0) or 0)
+    volume24h_usd = float(ticker.get("volume24",  0) or 0)
+    open_interest = float(ticker.get("holdVol",   0) or 0)
 
-    if futures_price == 0 or fair_price == 0:
+    if futures_price == 0 or spot_price == 0:
         return False, {}
 
-    spread = calc_spread(fair_price, futures_price)
+    spread = calc_spread(spot_price, futures_price)
     if abs(spread) < SPREAD_THRESHOLD:
         return False, {}
 
@@ -238,7 +255,7 @@ def passes_filters(symbol: str, ticker: dict) -> tuple[bool, dict]:
     return True, {
         "symbol":        symbol,
         "futures_price": futures_price,
-        "fair_price":    fair_price,
+        "fair_price":    fair_price if fair_price else spot_price,
         "spread":        spread,
         "volume24h_usd": volume24h_usd,
         "oi_usd":        oi_usd,
@@ -327,7 +344,10 @@ async def parser_loop(bot: Bot):
                 await load_contract_details(session)
                 last_detail_load = loop_start
 
-            tickers = await fetch_all_tickers(session)
+            tickers, spot_prices = await asyncio.gather(
+                fetch_all_tickers(session),
+                fetch_spot_prices(session),
+            )
 
             for ticker in tickers:
                 symbol = ticker.get("symbol", "")
@@ -337,11 +357,17 @@ async def parser_loop(bot: Bot):
                 if fp == 0 or vol < MIN_VOLUME_24H:
                     continue
 
-                ok, info = passes_filters(symbol, ticker)
+                spot_sym   = symbol.replace("_", "")
+                spot_price = spot_prices.get(spot_sym, 0)
+
+                if spot_price == 0:
+                    continue
+
+                ok, info = passes_filters(symbol, ticker, spot_price=spot_price)
                 if not ok:
                     continue
 
-                if not check_fair_futures_diff(info["fair_price"], info["futures_price"]):
+                if not check_spot_futures_diff(spot_price, info["futures_price"]):
                     continue
 
                 if not update_spread_history(symbol, info["spread"]):
